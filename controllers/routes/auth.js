@@ -28,48 +28,51 @@ router.post('/', middleware.proceedIfNotAuthenticated, middleware.validation, (r
             }
             if (!user) {
                 // if not user execute puppeteer function
-                (async () => {
-                    //Start puppeteer
-                    await puppeteerDataCollection(req, res, next, (newUser) => {
 
-                        if (newUser instanceof User) {
-                           // User was created, try to login with the new user
+                //Start puppeteer
+                puppeteerDataCollection(req, res, next, (newUser, error) => {
 
-                           req.logIn(newUser, function(err) {
-                               if (err) {
-                                   return next(err);
-                               }
+                    if (newUser) {
+                        // User was created, try to login with the new user
 
-                               req.flash('alerts', [{
-                                   param: 'user',
-                                   msg: 'Você está logado',
-                                   type: 'success'
-                               }]);
-
-                               res.redirect('/inicio');
-                           });
-
-                       } else if (newUser === null) {
-                            // Puppeteer couldn't login. user = null
+                        req.logIn(newUser, function(err) {
+                            if (err) {
+                                return next(err);
+                            }
 
                             req.flash('alerts', [{
                                 param: 'user',
-                                msg: 'Login ou Senha incorretos'
+                                msg: 'Você está logado',
+                                type: 'success'
                             }]);
 
-                            res.redirect('/auth');
+                            res.redirect('/inicio');
+                        });
 
-                        } else {
-                            // Error creating user. user = undefined
-                            req.flash('alerts', [{
-                                param: 'user',
-                                msg: 'Algo deu errado'
-                            }]);
+                    } else if (error) {
+                        // Error creating user. user = undefined
 
-                            res.redirect('/auth');
-                        }
-                    });
-                })();
+                        console.log(error);
+                        req.flash('alerts', [{
+                            param: 'user',
+                            msg: 'Algo deu errado, tente novamente em instantes',
+                            type: 'warning'
+                        }]);
+
+                        res.redirect('/auth');
+
+                    } else {
+                        // Puppeteer couldn't login. user = null
+
+                        req.flash('alerts', [{
+                            param: 'user',
+                            msg: 'Cpf ou Senha incorretos'
+                        }]);
+
+                        res.redirect('/auth');
+                    }
+                });
+
             } else {
                 // if user
                 if (info.status == 401) {
@@ -161,22 +164,14 @@ async function puppeteerDataCollection(req, res, next, callback) {
 
     var newUser = await puppeteer.collectData(req.body.username, req.body.password);
 
-    if (newUser != null) {
+    if (newUser) {
         User.createUser(newUser, (err, user) => {
-            // TODO: Erro de criar usuário
-            if (err) {
-                console.log(err);
-                req.flash('alerts', [{
-                    param: 'user',
-                    msg: 'Não foi possível fazer login em sua conta, tente novamente em instantes',
-                    type: 'warning'
-                }]);
-            }
-            callback(user);
+            // TODO: Erro de criar usuário // *done?
+            callback(user, err);
         });
 
     } else {
-        callback(null);
+        callback(null, null);
     }
 }
 
